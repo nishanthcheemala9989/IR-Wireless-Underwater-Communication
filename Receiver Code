@@ -1,0 +1,94 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <IRremote.h>
+
+// Pin Assignments
+const int recvPin = 2;   // IR receiver connected to pin D2
+const int greenLED = 4;  // Green LED connected to pin D4
+
+// LCD setup (I2C address 0x27, 16 columns, 2 rows)
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// IR Receiver setup
+IRrecv irReceiver(recvPin);
+decode_results results;
+
+String receivedMessage = "";  // To store the full message
+
+void setup() {
+    Serial.begin(9600);
+    irReceiver.enableIRIn();  // Start the IR receiver
+    Serial.println("Receiver Ready");
+
+    // Initialize LCD
+    lcd.init();
+    lcd.backlight();
+    lcd.setCursor(0, 0);
+    lcd.print("Waiting for IR");
+
+    // Initialize Green LED
+    pinMode(greenLED, OUTPUT);
+    digitalWrite(greenLED, LOW); // Ensure LED is OFF initially
+}
+
+void loop() {
+    if (irReceiver.decode(&results)) {
+        // Blink Green LED while receiving
+        digitalWrite(greenLED, HIGH);
+        delay(200);  // Blink LED ON for 200ms
+        digitalWrite(greenLED, LOW);
+        delay(200);  // Blink LED OFF for 200ms
+
+        // Convert received HEX to ASCII
+        char receivedChar = (char)(results.value & 0xFF);  // Extract lower byte
+        Serial.print("Received Char: ");
+        Serial.print(receivedChar);
+        Serial.print(" as Hex: ");
+        Serial.println(results.value, HEX);
+
+        // Check for termination signal (e.g., 0x00FF indicating end of message)
+        if (results.value == 0x00FF) {
+            Serial.println("Full Message Received!");
+
+            // Clear LCD and set up the first row
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("Message:");
+
+            if (receivedMessage.length() > 16) {
+                // Scroll the entire message from left to right
+                String scrollMessage = receivedMessage;  // Full message for scrolling
+                for (int i = 0; i < scrollMessage.length(); i++) {
+                    String scrollingText = scrollMessage.substring(i) + scrollMessage.substring(0, i);
+                    lcd.setCursor(0, 1);  // Set cursor to second row
+                    lcd.print(scrollingText.substring(0, 16));  // Display only 16 characters
+                    delay(500);  // Adjust delay for smooth scrolling
+                    lcd.clear();
+                    lcd.setCursor(0, 0);
+                    lcd.print("Message:");
+                }
+            } else {
+                lcd.setCursor(0, 1);
+                lcd.print(receivedMessage);  // Display message directly if <= 16 characters
+            }
+
+            // Keep Green LED ON for 5 seconds after scrolling ends
+            digitalWrite(greenLED, HIGH);
+            delay(5000);  // LED stays ON for 5 seconds
+            digitalWrite(greenLED, LOW);  // Turn LED OFF
+
+            // Clear LCD and prepare for next message
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("Waiting for IR");
+
+            // Reset the message storage
+            receivedMessage = "";
+        } else {
+            // Append received character to the message
+            receivedMessage += receivedChar;
+        }
+
+        irReceiver.resume();  // Prepare to receive the next signal
+    }
+}
