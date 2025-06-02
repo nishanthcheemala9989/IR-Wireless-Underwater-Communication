@@ -1,0 +1,35 @@
+#include <IRremote.h>
+
+IRsend irsend;  // IR transmitter object
+
+void setup() {
+    Serial.begin(9600);  // Initialize Serial Monitor
+    Serial.println("Transmitter Ready");
+    Serial.println("Enter your message in Serial Monitor and press Enter:");
+}
+
+void loop() {
+    // Check if there is any input in the Serial Monitor
+    if (Serial.available() > 0) {
+        String inputMessage = Serial.readString();  // Read full message from Serial Monitor
+        inputMessage.trim();  // Remove any trailing newline or carriage return
+        Serial.print("Sending Message: ");
+        Serial.println(inputMessage);
+
+        // Send each character in the message, including spaces
+        for (int i = 0; i < inputMessage.length(); i++) {
+            char asciiChar = inputMessage[i];
+            int hexValue = (int)asciiChar;  // Convert ASCII to hexadecimal
+            irsend.sendNEC(hexValue, 32);   // Transmit via NEC protocol
+            Serial.print("Sent Char: ");
+            Serial.print(asciiChar);
+            Serial.print(" as Hex: ");
+            Serial.println(hexValue, HEX);
+            delay(450);  // Add delay to ensure the receiver processes each character
+        }
+
+        // Send a termination signal after the message
+        irsend.sendNEC(0x00FF, 32);
+        Serial.println("Message Transmission Complete");
+    }
+}
